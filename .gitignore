@@ -1,0 +1,5 @@
+.idea/
+.cache/
+build/
+opencv/
+compile_commands.json
