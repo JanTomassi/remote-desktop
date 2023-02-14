@@ -40,7 +40,7 @@ include_directories(
     ${AV_SWSCALE_INCLUDE_DIRS} 
     ../../inc 
     ../inc
-    ./
+    ./include
 )
 
 add_compile_options(-Wall -O0 -pg)
@@ -48,7 +48,7 @@ add_link_options()
 
 project( videoCapture )
 
-add_executable( videoCapture videoCaptureNvFBC.cpp tcpServer.cpp tcpServer.hpp protocol.hpp ../common/NvFBCUtils.c )
+add_executable( videoCapture src/videoCaptureNvFBC.cpp src/tcpServer.cpp ../common/NvFBCUtils.c )
 target_link_libraries( videoCapture 
     ${OpenCV_LIBS} 
     ${OpenGL_LIBRARIES} 
@@ -65,13 +65,13 @@ target_link_libraries( videoCapture
 
 project( videoStream )
 
-add_executable( videoStream tcpClient.cpp protocol.hpp)
+add_executable( videoStream src/tcpClient.cpp )
 target_link_libraries( videoStream ${OpenCV_LIBS} ${OpenGL_LIBRARIES} ${X11_LIBRARIES} )
 
 project( chatServer )
 
-add_executable( chatServer chat_server.cpp )
+add_executable( chatServer src/chat_server.cpp )
 
 project( chatClient)
 
-add_executable( chatClient chat_client.cpp )
+add_executable( chatClient src/chat_client.cpp )
