@@ -26,6 +26,8 @@ if(${AV_CODEC_FOUND})
     MESSAGE("av codec libs3 "${AV_CODEC_LIBS})
 endif()
 
+add_subdirectory(submodule/SDL)
+
 include_directories(
     ${OpenCV_INCLUDE_DIRS} 
     ${OpenGL_INCLUDE_DIRS} 
@@ -50,23 +52,29 @@ project( videoCapture )
 
 add_executable( videoCapture src/videoCaptureNvFBC.cpp src/tcpServer.cpp ../common/NvFBCUtils.c )
 target_link_libraries( videoCapture 
-    ${OpenCV_LIBS} 
-    ${OpenGL_LIBRARIES} 
-    ${X11_LIBRARIES} 
-    ${AV_C1394_LIBRARIES} 
-    ${AV_CODEC_LIBRARIES} 
-    ${AV_DEVICE_LIBRARIES} 
-    ${AV_FILTER_LIBRARIES} 
-    ${AV_FORMAT_LIBRARIES} 
-    ${AV_IF_LIBRARIES} 
-    ${AV_UTIL_LIBRARIES} 
-    ${AV_SWSCALE_LIBRARIES} 
+    PRIVATE SDL3::SDL3-static 
+    PRIVATE ${OpenCV_LIBS} 
+    PRIVATE ${OpenGL_LIBRARIES} 
+    PRIVATE ${X11_LIBRARIES} 
+    PRIVATE ${AV_C1394_LIBRARIES} 
+    PRIVATE ${AV_CODEC_LIBRARIES} 
+    PRIVATE ${AV_DEVICE_LIBRARIES} 
+    PRIVATE ${AV_FILTER_LIBRARIES} 
+    PRIVATE ${AV_FORMAT_LIBRARIES} 
+    PRIVATE ${AV_IF_LIBRARIES} 
+    PRIVATE ${AV_UTIL_LIBRARIES} 
+    PRIVATE ${AV_SWSCALE_LIBRARIES} 
     )
 
 project( videoStream )
 
 add_executable( videoStream src/tcpClient.cpp )
-target_link_libraries( videoStream ${OpenCV_LIBS} ${OpenGL_LIBRARIES} ${X11_LIBRARIES} )
+target_link_libraries( videoStream 
+    PRIVATE SDL3::SDL3-static
+    PRIVATE ${OpenCV_LIBS} 
+    PRIVATE ${OpenGL_LIBRARIES} 
+    PRIVATE ${X11_LIBRARIES}
+    )
 
 project( chatServer )
 

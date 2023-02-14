@@ -1,3 +1,4 @@
+#+BEGIN_SRC cpp :tangle yes
 /*!
  * \brief
  * Demonstrates how a main thread can create a FBC context, then create
@@ -514,3 +515,4 @@ int main(int argc, char *argv[]) {
 
   return EXIT_SUCCESS;
 }
+#+END_SRC
