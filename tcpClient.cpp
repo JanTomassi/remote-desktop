@@ -143,9 +143,9 @@ int main() {
             boost::asio::buffer(pkt->data, header_data.image_size_bytes),
             boost::asio::transfer_exactly(header_data.image_size_bytes),
             ignored_error);
-        std::cout << "recv/expeted: " << recv << " / "
-                  << header_data.image_size_bytes << " -> "
-                  << (float)recv / header_data.image_size_bytes << std::endl;
+        // std::cout << "recv/expeted: " << recv << " / "
+        //           << header_data.image_size_bytes << " -> "
+        //           << (float)recv / header_data.image_size_bytes << std::endl;
         decode_pkt(c, frame, pkt);
         av_packet_unref(pkt);
       }

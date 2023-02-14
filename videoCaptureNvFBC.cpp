@@ -257,7 +257,7 @@ int main(int argc, char *argv[]) {
   NVFBC_RELEASE_CONTEXT_PARAMS releaseParams;
   NVFBC_BIND_CONTEXT_PARAMS bindParams;
 
-  av_log_set_level(AV_LOG_TRACE);
+  av_log_set_level(AV_LOG_INFO);
   // av_log_set_callback(my_log_callback);
 
   /*
