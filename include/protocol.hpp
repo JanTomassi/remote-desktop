@@ -9,9 +9,9 @@ extern "C" {
 #include "libavutil/avutil.h"
 #include "libswscale/swscale.h"
 #include <libavcodec/avcodec.h>
-#include <libavutil/imgutils.h>
 #include <libavcodec/packet.h>
 #include <libavutil/frame.h>
+#include <libavutil/imgutils.h>
 }
 
 class videoThreadParams {
@@ -19,14 +19,20 @@ public:
   AVFrame *frame;
   AVPacket *pkt;
   AVCodecContext *ctx;
-  videoThreadParams(const videoThreadParams& x){
+  videoThreadParams(const videoThreadParams &x) {
     pkt = av_packet_clone(x.pkt);
     frame = av_frame_clone(x.frame);
     ctx = x.ctx;
   }
-videoThreadParams(){
+  videoThreadParams() {
     frame = nullptr;
-    pkt=nullptr;
-    ctx=nullptr;
+    pkt = nullptr;
+    ctx = nullptr;
   }
 };
+
+typedef struct {
+  int width;
+  int height;
+  size_t image_size_bytes;
+} image_metadata_t;

@@ -1,10 +1,10 @@
-#include "opencv2/highgui.hpp"
-#include "opencv2/highgui/highgui.hpp"
-#include "opencv2/imgproc/imgproc.hpp"
 #include <boost/array.hpp>
 #include <boost/asio.hpp>
 #include <boost/asio/completion_condition.hpp>
 #include <iostream>
+#include <opencv2/highgui.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/objdetect/objdetect.hpp>
 #include <string>
 #include <vector>
@@ -19,29 +19,16 @@ extern "C" {
 #include <libswscale/swscale.h>
 }
 
-#include "protocol.hpp"
-
-using boost::asio::ip::tcp;
-
-// source https://www.programmerall.com/article/7721373696/
-// source
-// https://cppsecrets.com/users/14041151035752494957504952535764103109971051084699111109/Programming-in-C00-using-boostasio.php
-
-struct image_metadata_t {
-  int width;
-  int height;
-  size_t image_size_bytes;
-};
+#include "../include/protocol.hpp"
 
 image_metadata_t parse_header(boost::asio::streambuf &buffer) {
-
   std::string data_buff_str =
       std::string(boost::asio::buffer_cast<const char *>(buffer.data()));
-  // cout << data_buff_str << endl;
 
   int x_pos = data_buff_str.find("x");
   int end_pos = data_buff_str.find(' ');
   int end_size = data_buff_str.find('e', end_pos);
+  std::string data;
 
   image_metadata_t meta_data;
   meta_data.width = std::stoi(data_buff_str.substr(0, x_pos));
@@ -116,9 +103,9 @@ int main() {
 
   try {
     boost::asio::io_service io_service;
-    tcp::endpoint end_point(
+    boost::asio::ip::tcp::endpoint end_point(
         boost::asio::ip::address::from_string("192.168.0.1"), 3200);
-    tcp::socket socket(io_service);
+    boost::asio::ip::tcp::socket socket(io_service);
     socket.connect(end_point);
     boost::system::error_code ignored_error;
     // cv::namedWindow("client", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
