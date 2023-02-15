@@ -6,7 +6,7 @@ set(CMAKE_EXE_LINKER_FLAGS -pg)
 set(CMAKE_SHARED_LINKER_FLAGS -pg)
 
 find_package( OpenCV REQUIRED )
-find_package( X11 REQUIRED )
+#find_package( X11 REQUIRED )
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules( AV_C1394 REQUIRED IMPORTED_TARGET libavc1394)
@@ -18,13 +18,6 @@ pkg_check_modules( AV_IF REQUIRED IMPORTED_TARGET libavif )
 pkg_check_modules( AV_UTIL REQUIRED IMPORTED_TARGET libavutil )
 pkg_check_modules( AV_SWSCALE REQUIRED IMPORTED_TARGET libswscale)
 pkg_check_modules( OpenGL REQUIRED IMPORTED_TARGET opengl)
-
-if(${AV_CODEC_FOUND})
-    MESSAGE("pkg-config executable " ${PKG_CONFIG_EXECUTABLE})
-    MESSAGE("AV codec libs " ${AV_CODEC_LIBRARIES})
-    MESSAGE("av codec libs2 "${AV_CODEC_LINK_LIBRARIES})
-    MESSAGE("av codec libs3 "${AV_CODEC_LIBS})
-endif()
 
 add_subdirectory(submodule/SDL)
 
@@ -50,7 +43,7 @@ add_link_options()
 
 project( videoCapture )
 
-add_executable( videoCapture src/videoCaptureNvFBC.cpp src/tcpServer.cpp ../common/NvFBCUtils.c )
+add_executable( videoCapture src/videoCaptureNvFBC.cpp src/tcpServer.cpp src/NvFBCUtils.c )
 target_link_libraries( videoCapture 
     PRIVATE SDL3::SDL3-static 
     PRIVATE ${OpenCV_LIBS} 
@@ -75,11 +68,3 @@ target_link_libraries( videoStream
     PRIVATE ${OpenGL_LIBRARIES} 
     PRIVATE ${X11_LIBRARIES}
     )
-
-project( chatServer )
-
-add_executable( chatServer src/chat_server.cpp )
-
-project( chatClient)
-
-add_executable( chatClient src/chat_client.cpp )
