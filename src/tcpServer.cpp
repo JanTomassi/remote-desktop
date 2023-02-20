@@ -26,8 +26,6 @@ extern "C" {
 
 tcpServer *tcpServer::instance = nullptr;
 
-std::deque<boost::asio::mutable_buffer> send_buff;
-
 void tcpServer::encode_send(videoThreadParams *video_param) {
   int ret;
 
@@ -54,10 +52,8 @@ void tcpServer::encode_send(videoThreadParams *video_param) {
 int tcpServer::send_frame(videoThreadParams *video_param) {
   std::stringstream header_stream;
 
-  header_stream << video_param->frame->width << 'x'
-                << video_param->frame->height << " "
-                << std::to_string(video_param->pkt->buf->size) << 'e'
-                << std::endl;
+  header_stream << video_param->frame->width << 'x' << video_param->frame->height << " "
+                << std::to_string(video_param->pkt->buf->size) << 'e' << std::endl;
 
   std::flush(header_stream);
 
@@ -66,11 +62,9 @@ int tcpServer::send_frame(videoThreadParams *video_param) {
 
   boost::system::error_code ignored_error;
 
-  auto send = std::make_unique<std::array<boost::asio::const_buffer, 2>>(
-      std::array<boost::asio::const_buffer, 2>{
-          boost::asio::buffer(header, PKTSIZE),
-          boost::asio::buffer(video_param->pkt->buf->data,
-                              video_param->pkt->buf->size)});
+  auto send = std::make_unique<std::array<boost::asio::const_buffer, 2>>(std::array<boost::asio::const_buffer, 2>{
+      boost::asio::buffer(header, PKTSIZE),
+      boost::asio::buffer(video_param->pkt->buf->data, video_param->pkt->buf->size)});
 
   // io_context.restart();
   // boost::asio::async_write(

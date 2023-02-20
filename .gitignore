@@ -1,5 +1,7 @@
 .idea/
 .cache/
+doxygen/html
+doxygen/latex
 build/
 opencv/
 compile_commands.json

@@ -31,8 +31,8 @@ public:
   }
 };
 
-typedef struct {
-  int width;
-  int height;
-  size_t image_size_bytes;
-} image_metadata_t;
+struct image_metadata_t {
+  int width = 0;
+  int height = 0;
+  size_t image_size_bytes = 0;
+};

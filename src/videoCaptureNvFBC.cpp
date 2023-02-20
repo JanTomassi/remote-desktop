@@ -1,54 +1,22 @@
 /*!
- * \brief
- * Demonstrates how a main thread can create a FBC context, then create
- * a worker thread that performs the capture.
- *
- * It is similar to the NvFBCMultiThread sample application, except that
- * here the FBC context is shared between threads instead of having one
- * FBC context per thread.
- *
  * \file
- * This sample demonstrates the following features:
- * - Capture to system memory;
- * - Multi-threaded capture;
- * - Shared FBC context;
- * - Synchronous (blocking) capture.
- *
- *
- * \copyright
- * Copyright (c) 2014-2017, NVIDIA CORPORATION. All rights reserved.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
+ * \brief
+ * This is the entry point for the videoCapture program
  */
 
 #include <SDL.h>
-#include <cstddef>
 #include <dlfcn.h>
 #include <getopt.h>
-#include <iostream>
 #include <pthread.h>
-#include <sstream>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include <cstddef>
+#include <iostream>
+#include <sstream>
 
 extern "C" {
 #include <libavcodec/codec.h>
@@ -61,13 +29,12 @@ extern "C" {
 #include <libswscale/swscale.h>
 }
 
-#include <boost/asio.hpp>
-
+#include <NvFBC.h>
 #include <X11/Xlib.h>
 
-#include "NvFBCUtils.h"
-#include <NvFBC.h>
+#include <boost/asio.hpp>
 
+#include "NvFBCUtils.h"
 #include "protocol.hpp"
 #include "tcpServer.hpp"
 
@@ -78,33 +45,28 @@ extern "C" {
 #define N_FRAMES -1
 #define N_THREADS 1
 
-static void *libNVFBC = NULL;
-static PNVFBCCREATEINSTANCE NvFBCCreateInstance_ptr = NULL;
+static void                   *libNVFBC                = NULL;
+static PNVFBCCREATEINSTANCE    NvFBCCreateInstance_ptr = NULL;
 static NVFBC_API_FUNCTION_LIST pFn;
-unsigned char *frame = NULL;
-NVFBC_SESSION_HANDLE fbcHandle;
+unsigned char                 *frame = NULL;
+NVFBC_SESSION_HANDLE           fbcHandle;
 
 /**
- * Creates and sets up a capture session to system memory.
- *
- * Captures a bunch of frames, converts them to BMP and saves them to the disk.
- *
- * This function is called per thread.
+ * @brief Main loop for caputuring frame
+ * @param th_params wrap all params in a single struct
+ * Bind to the Frame Buffer Context, then get one frame every
+ * screen refresh and send it to the TCP Server using tcpServer singleton
  */
 static void th_entry_point(videoThreadParams *th_params) {
   NVFBCSTATUS fbcStatus;
 
-  NVFBC_BIND_CONTEXT_PARAMS bindParams;
+  NVFBC_BIND_CONTEXT_PARAMS    bindParams;
   NVFBC_RELEASE_CONTEXT_PARAMS releaseParams;
 
   tcpServer *server = tcpServer::getInstance();
-  std::cout << "Success" << std::endl;
 
-  /*
-   * The worker thread is about to use the FBC context, bind it.
-   */
+  // Reset and bind to the FBC
   memset(&bindParams, 0, sizeof(bindParams));
-
   bindParams.dwVersion = NVFBC_BIND_CONTEXT_PARAMS_VER;
 
   fbcStatus = pFn.nvFBCBindContext(fbcHandle, &bindParams);
@@ -113,27 +75,13 @@ static void th_entry_point(videoThreadParams *th_params) {
     return;
   }
 
-  /*
-   * Create a capture session to system memory.
-   *
-   * Pass the thread specific capture box and frame size.
-   */
-  printf("Worker thread: Capturing frames of size %dx%d.\n",
-         th_params->frame->width, th_params->frame->height);
-
-  // SwsContext *conversion = sws_getContext(
-  //     th_params->frame->width, th_params->frame->height, AV_PIX_FMT_BGRA,
-  //     th_params->frame->width, th_params->frame->height, AV_PIX_FMT_NV12,
-  //     SWS_FAST_BILINEAR, NULL, NULL, NULL);
+  // Start the caputure loop
+  printf("Worker thread: Capturing frames of size %dx%d.\n", th_params->frame->width, th_params->frame->height);
 
   for (int _ = 0; _ < 1000000; _++) {
-    int res;
-
+    int                           res;
     NVFBC_TOSYS_GRAB_FRAME_PARAMS grabParams;
-
-    NVFBC_FRAME_GRAB_INFO frameInfo;
-
-    // t1 = NvFBCUtilsGetTimeInMillis();
+    NVFBC_FRAME_GRAB_INFO         frameInfo;
 
     memset(&grabParams, 0, sizeof(grabParams));
     memset(&frameInfo, 0, sizeof(frameInfo));
@@ -162,42 +110,19 @@ static void th_entry_point(videoThreadParams *th_params) {
       goto done;
     }
 
-    // t2 = NvFBCUtilsGetTimeInMillis();
-
-    // t_grabbed_ms = t2 - t1;
-
-    // t1 = NvFBCUtilsGetTimeInMillis();
-
-    // sprintf(filename, "frame%u.bmp", frameInfo.dwCurrentFrame);
-
-    /*
-     * Convert RGB frame to BMP and save it on the disk.
-     *
-     * This operation can be quite slow.
-     */
     res = av_frame_make_writable(th_params->frame);
-    if (res < 0)
-      exit(1);
+    if (res < 0) exit(1);
 
     size_t pos = th_params->ctx->height * th_params->frame->linesize[0];
     memcpy(th_params->frame->data[0], frame, pos);
 
     /* Cb and Cr */
-    memcpy(th_params->frame->data[1], &frame[pos + 1],
-           th_params->ctx->height * th_params->frame->linesize[1]);
+    memcpy(th_params->frame->data[1], &frame[pos + 1], th_params->ctx->height * th_params->frame->linesize[1]);
     pos *= 2;
-    memcpy(th_params->frame->data[2], &frame[pos + 1],
-           th_params->ctx->height * th_params->frame->linesize[2]);
+    memcpy(th_params->frame->data[2], &frame[pos + 1], th_params->ctx->height * th_params->frame->linesize[2]);
 
     th_params->frame->pts++;
     server->encode_send(th_params);
-
-    // t2 = NvFBCUtilsGetTimeInMillis();
-
-    // printf("Worker thread: New frame id %u grabbed in %llu ms, "
-    //        "saved in %llu ms.\n",
-    //        frameInfo.dwCurrentFrame, (unsigned long long)t_grabbed_ms,
-    //        (unsigned long long)(t2 - t1));
   }
 
 done:
@@ -223,8 +148,7 @@ static void usage(const char *pname) {
   printf("\n");
   printf("Options:\n");
   printf("  --help|-h\t\tThis message\n");
-  printf("  --frames|-f <n>\tNumber of frames to capture (default: %u)\n",
-         N_FRAMES);
+  printf("  --frames|-f <n>\tNumber of frames to capture (default: %u)\n", N_FRAMES);
 }
 
 void my_log_callback(void *ptr, int level, const char *fmt, va_list vargs) {
@@ -236,24 +160,23 @@ void my_log_callback(void *ptr, int level, const char *fmt, va_list vargs) {
  * Creates an NvFBC instance, then creates a worker thread to capture frames.
  */
 int main(int argc, char *argv[]) {
-  static struct option longopts[] = {{"frames", required_argument, NULL, 'f'},
-                                     {NULL, 0, NULL, 0}};
+  static struct option longopts[] = {{"frames", required_argument, NULL, 'f'}, {NULL, 0, NULL, 0}};
 
   int opt, res;
 
-  pthread_t th_id;
+  pthread_t         th_id;
   videoThreadParams th_params;
 
   NVFBCSTATUS fbcStatus;
 
-  NVFBC_CREATE_HANDLE_PARAMS createHandleParams;
-  NVFBC_GET_STATUS_PARAMS statusParams;
-  NVFBC_CREATE_CAPTURE_SESSION_PARAMS createCaptureParams;
+  NVFBC_CREATE_HANDLE_PARAMS           createHandleParams;
+  NVFBC_GET_STATUS_PARAMS              statusParams;
+  NVFBC_CREATE_CAPTURE_SESSION_PARAMS  createCaptureParams;
   NVFBC_DESTROY_CAPTURE_SESSION_PARAMS destroyCaptureParams;
-  NVFBC_DESTROY_HANDLE_PARAMS destroyHandleParams;
-  NVFBC_TOSYS_SETUP_PARAMS setupParams;
-  NVFBC_RELEASE_CONTEXT_PARAMS releaseParams;
-  NVFBC_BIND_CONTEXT_PARAMS bindParams;
+  NVFBC_DESTROY_HANDLE_PARAMS          destroyHandleParams;
+  NVFBC_TOSYS_SETUP_PARAMS             setupParams;
+  NVFBC_RELEASE_CONTEXT_PARAMS         releaseParams;
+  NVFBC_BIND_CONTEXT_PARAMS            bindParams;
 
   av_log_set_level(AV_LOG_INFO);
   // av_log_set_callback(my_log_callback);
@@ -263,10 +186,10 @@ int main(int argc, char *argv[]) {
    */
   while ((opt = getopt_long(argc, argv, "hf:", longopts, NULL)) != -1) {
     switch (opt) {
-    case 'h':
-    default:
-      usage(argv[0]);
-      return EXIT_SUCCESS;
+      case 'h':
+      default:
+        usage(argv[0]);
+        return EXIT_SUCCESS;
     }
   }
 
@@ -285,8 +208,7 @@ int main(int argc, char *argv[]) {
    * Resolve the 'NvFBCCreateInstance' symbol that will allow us to get
    * the API function pointers.
    */
-  NvFBCCreateInstance_ptr =
-      (PNVFBCCREATEINSTANCE)dlsym(libNVFBC, "NvFBCCreateInstance");
+  NvFBCCreateInstance_ptr = (PNVFBCCREATEINSTANCE)dlsym(libNVFBC, "NvFBCCreateInstance");
   if (NvFBCCreateInstance_ptr == NULL) {
     fprintf(stderr, "Unable to resolve symbol 'NvFBCCreateInstance'\n");
     return EXIT_FAILURE;
@@ -303,8 +225,7 @@ int main(int argc, char *argv[]) {
 
   fbcStatus = NvFBCCreateInstance_ptr(&pFn);
   if (fbcStatus != NVFBC_SUCCESS) {
-    fprintf(stderr, "Unable to create NvFBC instance (status: %d)\n",
-            fbcStatus);
+    fprintf(stderr, "Unable to create NvFBC instance (status: %d)\n", fbcStatus);
     return EXIT_FAILURE;
   }
 
@@ -338,29 +259,29 @@ int main(int argc, char *argv[]) {
   }
 
   if (statusParams.bCanCreateNow == NVFBC_FALSE) {
-    fprintf(stderr, "It is not possible to create a capture session "
-                    "on this system.\n");
+    fprintf(stderr,
+            "It is not possible to create a capture session "
+            "on this system.\n");
     return 1;
   }
 
   auto display = [statusParams](std::ostream &os) {
     os << "Name of connected display\n";
     for (int i = 0; i < statusParams.dwOutputNum; i++) {
-      os << "Display: " << statusParams.outputs[i].name << "    \tid: " << i
-         << std::endl;
+      os << "Display: " << statusParams.outputs[i].name << "    \tid: " << i << std::endl;
     }
   };
   display(std::cout);
 
   memset(&createCaptureParams, 0, sizeof(createCaptureParams));
 
-  createCaptureParams.dwVersion = NVFBC_CREATE_CAPTURE_SESSION_PARAMS_VER;
-  createCaptureParams.eCaptureType = NVFBC_CAPTURE_TO_SYS;
-  createCaptureParams.bWithCursor = NVFBC_TRUE;
-  createCaptureParams.frameSize.w = VSIZEW;
-  createCaptureParams.frameSize.h = VSIZEH;
-  createCaptureParams.eTrackingType = NVFBC_TRACKING_OUTPUT;
-  createCaptureParams.dwOutputId = statusParams.outputs[1].dwId;
+  createCaptureParams.dwVersion        = NVFBC_CREATE_CAPTURE_SESSION_PARAMS_VER;
+  createCaptureParams.eCaptureType     = NVFBC_CAPTURE_TO_SYS;
+  createCaptureParams.bWithCursor      = NVFBC_TRUE;
+  createCaptureParams.frameSize.w      = VSIZEW;
+  createCaptureParams.frameSize.h      = VSIZEH;
+  createCaptureParams.eTrackingType    = NVFBC_TRACKING_OUTPUT;
+  createCaptureParams.dwOutputId       = statusParams.outputs[1].dwId;
   createCaptureParams.dwSamplingRateMs = 30;
 
   fbcStatus = pFn.nvFBCCreateCaptureSession(fbcHandle, &createCaptureParams);
@@ -377,10 +298,10 @@ int main(int argc, char *argv[]) {
    */
   memset(&setupParams, 0, sizeof(setupParams));
 
-  setupParams.dwVersion = NVFBC_TOSYS_SETUP_PARAMS_VER;
+  setupParams.dwVersion     = NVFBC_TOSYS_SETUP_PARAMS_VER;
   setupParams.eBufferFormat = NVFBC_BUFFER_FORMAT_YUV444P;
-  setupParams.ppBuffer = (void **)&frame;
-  setupParams.bWithDiffMap = NVFBC_FALSE;
+  setupParams.ppBuffer      = (void **)&frame;
+  setupParams.bWithDiffMap  = NVFBC_FALSE;
 
   fbcStatus = pFn.nvFBCToSysSetUp(fbcHandle, &setupParams);
   if (fbcStatus != NVFBC_SUCCESS) {
@@ -402,54 +323,39 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  /*
-   * Create thread.
-   */
+  // Init ffmpeg packet that is the encoded version of a frame
   th_params.pkt = av_packet_alloc();
 
-  auto codec = avcodec_find_encoder(AV_CODEC_ID_H264);
+  // Init ffmpeg av codec context
+  auto codec    = avcodec_find_encoder(AV_CODEC_ID_H264);
   th_params.ctx = avcodec_alloc_context3(codec);
 
-  /* put sample parameters */
-  // th_params.ctx->bit_rate = 4'000'000;
-  // th_params.ctx->bit_rate_tolerance = 3'000'000;
-  /* resolution must be a multiple of two */
-  th_params.ctx->width = VSIZEW;
-  th_params.ctx->height = VSIZEH;
-  /* frames per second */
+  // Set context param
+  th_params.ctx->width     = VSIZEW;
+  th_params.ctx->height    = VSIZEH;
   th_params.ctx->time_base = (AVRational){1, 30};
   th_params.ctx->framerate = (AVRational){30, 1};
+  th_params.ctx->pix_fmt   = AV_PIX_FMT_YUV444P;
 
-  /* emit one intra frame every ten frames
-   * check frame pict_type before passing frame
-   * to encoder, if frame->pict_type is AV_PICTURE_TYPE_I
-   * then gop_size is ignored and the output of encoder
-   * will always be I frame irrespective to gop_size
-   */
-  // th_params.ctx->gop_size = 60;
-  // th_params.ctx->max_b_frames = 0;
-  th_params.ctx->pix_fmt = AV_PIX_FMT_YUV444P;
-
+  // Set specific context params
   if (codec->id == AV_CODEC_ID_H264) {
     av_opt_set(th_params.ctx->priv_data, "preset", "ultrafast", 0);
     av_opt_set(th_params.ctx->priv_data, "tune", "zerolatency", 0);
-    // av_opt_set(th_params.ctx->priv_data, "crf", "27", 0);
-    // av_opt_set(th_params.ctx->priv_data, "maxrate", "1M", 0);
-    // av_opt_set(th_params.ctx->priv_data, "bufsize", "2M", 0);
   }
 
-  /* open it */
+  // Open the ffmpeg context
   res = avcodec_open2(th_params.ctx, codec, NULL);
   if (res < 0) {
     fprintf(stderr, "Could not open codec: %d\n", (res));
     exit(1);
   }
 
-  th_params.frame = av_frame_alloc();
-  th_params.frame->width = VSIZEW;
+  // Allocate frame for passing single frame from FBC to encoder
+  th_params.frame         = av_frame_alloc();
+  th_params.frame->width  = VSIZEW;
   th_params.frame->height = VSIZEH;
   th_params.frame->format = AV_PIX_FMT_YUV444P;
-  th_params.frame->pts = 0;
+  th_params.frame->pts    = 0;
 
   res = av_frame_get_buffer(th_params.frame, 0);
   if (res < 0) {
@@ -459,8 +365,7 @@ int main(int argc, char *argv[]) {
 
   printf("Size %d x %d\n", th_params.frame->width, th_params.frame->height);
 
-  res = pthread_create(&th_id, NULL, (void *(*)(void *))th_entry_point,
-                       (void *)&th_params);
+  res = pthread_create(&th_id, NULL, (void *(*)(void *))th_entry_point, (void *)&th_params);
 
   if (res) {
     fprintf(stderr, "Unable to create worker thread (res: %d)\n", res);
