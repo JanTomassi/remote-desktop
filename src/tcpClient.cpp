@@ -1,3 +1,4 @@
+#include <SDL.h>
 #include <stdint.h>
 
 #include <boost/array.hpp>
@@ -26,6 +27,7 @@ extern "C" {
 #include <libavutil/imgutils.h>
 #include <libavutil/pixfmt.h>
 #include <libswscale/swscale.h>
+#include <xdo.h>
 }
 
 #include "../include/protocol.hpp"
@@ -201,8 +203,14 @@ int main() {
   cv::namedWindow("clientVideo", cv::WINDOW_FULLSCREEN | cv::WINDOW_GUI_NORMAL | cv::WINDOW_FREERATIO);
   av_log_set_level(AV_LOG_INFO);
 
+  xdo_t *x = xdo_new(NULL);
+
   try {
     for (;;) {
+      int mouse_x = 0, mouse_y = 0, mouse_screen_num = 0;
+      xdo_get_mouse_location(x, &mouse_x, &mouse_y, &mouse_screen_num);
+      std::cout << "x: " << mouse_x << "\ty: " << mouse_y << "\tsn: " << mouse_screen_num << std::endl;
+
       std::unique_ptr<boost::asio::streambuf> receive_buffer = std::make_unique<boost::asio::streambuf>();
 
       // Retrive 64 bytes header from socket

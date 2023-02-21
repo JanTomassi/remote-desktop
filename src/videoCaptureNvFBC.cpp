@@ -4,7 +4,6 @@
  * This is the entry point for the videoCapture program
  */
 
-#include <SDL.h>
 #include <dlfcn.h>
 #include <getopt.h>
 #include <pthread.h>
@@ -30,7 +29,7 @@ extern "C" {
 }
 
 #include <NvFBC.h>
-#include <X11/Xlib.h>
+#include <xdo.h>
 
 #include <boost/asio.hpp>
 
@@ -63,7 +62,7 @@ static void th_entry_point(videoThreadParams *th_params) {
   NVFBC_BIND_CONTEXT_PARAMS    bindParams;
   NVFBC_RELEASE_CONTEXT_PARAMS releaseParams;
 
-  tcpServer *server = tcpServer::getInstance();
+  tcpServerAV *server = tcpServerAV::getInstance();
 
   // Reset and bind to the FBC
   memset(&bindParams, 0, sizeof(bindParams));

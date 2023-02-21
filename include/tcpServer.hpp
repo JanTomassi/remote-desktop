@@ -14,36 +14,31 @@ extern "C" {
 
 #include "protocol.hpp"
 
-class tcpServer {
+class tcpServerAV {
  private:
   boost::asio::io_context                       io_context;
   boost::asio::ip::tcp::acceptor               *acceptor;
   std::unique_ptr<boost::asio::ip::tcp::socket> socket;
-  std::unique_ptr<
-      boost::asio::executor_work_guard<boost::asio::io_context::executor_type>>
-      work;
+  // std::unique_ptr<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>> work;
 
-  static tcpServer *instance;
+  static tcpServerAV *instance;
 
-  tcpServer() {
-    acceptor = new boost::asio::ip::tcp::acceptor(
-        io_context,
-        boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port));
+  tcpServerAV() {
+    acceptor = new boost::asio::ip::tcp::acceptor(io_context,
+                                                  boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port));
 
-    socket = std::make_unique<boost::asio::ip::tcp::socket>(
-        acceptor->accept(io_context));
+    socket = std::make_unique<boost::asio::ip::tcp::socket>(acceptor->accept(io_context));
 
-    work = std::make_unique<boost::asio::executor_work_guard<
-        boost::asio::io_context::executor_type>>(
-        boost::asio::make_work_guard(io_context));
+    // work =
+    // std::make_unique<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>>(boost::asio::make_work_guard(io_context));
 
     std::cout << "Success" << std::endl;
   }
 
  public:
-  static tcpServer *getInstance() {
+  static tcpServerAV *getInstance() {
     if (instance == nullptr) {
-      instance = new tcpServer();
+      instance = new tcpServerAV();
     }
     return instance;
   }

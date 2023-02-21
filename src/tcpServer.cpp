@@ -24,9 +24,12 @@ extern "C" {
 #include "../include/protocol.hpp"
 #include "../include/tcpServer.hpp"
 
-tcpServer *tcpServer::instance = nullptr;
+tcpServerAV *tcpServerAV::instance = nullptr;
 
-void tcpServer::encode_send(videoThreadParams *video_param) {
+/**
+ * @brief Encode a passed frame in a packet send it to @ref tcpServer::send_frame
+ * @param[in] video_param struct containing the AV Codec Context and the source frame */
+void tcpServerAV::encode_send(videoThreadParams *video_param) {
   int ret;
 
   ret = avcodec_send_frame(video_param->ctx, video_param->frame);
@@ -44,12 +47,14 @@ void tcpServer::encode_send(videoThreadParams *video_param) {
       exit(1);
     }
 
-    tcpServer::send_frame(video_param);
+    tcpServerAV::send_frame(video_param);
     av_packet_unref(video_param->pkt);
   }
 }
-
-int tcpServer::send_frame(videoThreadParams *video_param) {
+/**
+ * @brief Send a frame using the tcp socket defined in the class
+ * @param[in] video_param struct containing the original AV frame and the encoded AV packet */
+int tcpServerAV::send_frame(videoThreadParams *video_param) {
   std::stringstream header_stream;
 
   header_stream << video_param->frame->width << 'x' << video_param->frame->height << " "

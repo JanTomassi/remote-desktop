@@ -17,6 +17,7 @@ pkg_check_modules( AV_FORMAT REQUIRED IMPORTED_TARGET libavformat )
 pkg_check_modules( AV_IF REQUIRED IMPORTED_TARGET libavif )
 pkg_check_modules( AV_UTIL REQUIRED IMPORTED_TARGET libavutil )
 pkg_check_modules( AV_SWSCALE REQUIRED IMPORTED_TARGET libswscale)
+pkg_check_modules( XORG_DO REQUIRED IMPORTED_TARGET libxdo )
 pkg_check_modules( OpenGL REQUIRED IMPORTED_TARGET opengl)
 
 add_subdirectory(submodule/SDL)
@@ -56,15 +57,16 @@ target_link_libraries( videoCapture
     PRIVATE ${AV_FORMAT_LIBRARIES} 
     PRIVATE ${AV_IF_LIBRARIES} 
     PRIVATE ${AV_UTIL_LIBRARIES} 
-    PRIVATE ${AV_SWSCALE_LIBRARIES} 
+    PRIVATE ${AV_SWSCALE_LIBRARIES}
+    PRIVATE ${XORG_DO}
     )
 
 project( videoStream )
-
 add_executable( videoStream src/tcpClient.cpp )
 target_link_libraries( videoStream 
     PRIVATE SDL3::SDL3-static
     PRIVATE ${OpenCV_LIBS} 
     PRIVATE ${OpenGL_LIBRARIES} 
     PRIVATE ${X11_LIBRARIES}
+    PRIVATE ${XORG_DO_LIBRARIES}
     )
