@@ -1,6 +1,8 @@
 #pragma once
 //! @brief tcp socket port for AV packet
-#define port 3200
+#include <cstdint>
+#define PORT_AV 3200
+#define PORT_XDO 3201
 #define PKTSIZE 64
 #define VSIZEW 1920
 #define VSIZEH 1080
@@ -37,4 +39,22 @@ struct image_metadata_t {
   int    width            = 0;
   int    height           = 0;
   size_t image_size_bytes = 0;
+};
+
+typedef struct mouse {
+  uint16_t x = 0;
+  uint16_t y = 0;
+  enum key { LEFT, MID, RIGHT, UP, DOWN };
+  key key;
+} mouse_t;
+typedef struct keyboard {
+  bool ctrl  = false;
+  bool shift = false;
+  bool alt   = false;
+  bool mod   = false;
+  char key   = false;
+} keyboard_t;
+struct xdo_packet_t {
+  mouse_t    mouse;
+  keyboard_t key;
 };

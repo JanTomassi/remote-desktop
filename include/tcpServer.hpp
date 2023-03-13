@@ -25,7 +25,7 @@ class tcpServerAV {
 
   tcpServerAV() {
     acceptor = new boost::asio::ip::tcp::acceptor(io_context,
-                                                  boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port));
+                                                  boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), PORT_AV));
 
     socket = std::make_unique<boost::asio::ip::tcp::socket>(acceptor->accept(io_context));
 

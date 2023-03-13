@@ -1,11 +1,22 @@
 cmake_minimum_required(VERSION 3.14)
 
+enable_language(CXX)
+
 set( CMAKE_EXPORT_COMPILE_COMMANDS on)
 set(CMAKE_CXX_FLAGS -pg)
 set(CMAKE_EXE_LINKER_FLAGS -pg)
 set(CMAKE_SHARED_LINKER_FLAGS -pg)
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 
 find_package( OpenCV REQUIRED )
+
+set(Boost_USE_STATIC_LIBS ON)
+set(Boost_USE_MULTITHREADED ON)
+set(Boost_USE_STATIC_RUNTIME OFF)
+set(Boost_NO_BOOST_CMAKE ON)
+find_package(Boost COMPONENTS thread REQUIRED)
 #find_package( X11 REQUIRED )
 
 find_package(PkgConfig REQUIRED)
@@ -39,10 +50,12 @@ include_directories(
     ./include
 )
 
-add_compile_options(-Wall -O0 -pg)
+add_compile_options(-Wall -O0 -g -pg)
 add_link_options()
 
 project( videoCapture )
+
+message("Test di boost\n${Boost_LIBS}\n\n")
 
 add_executable( videoCapture src/videoCaptureNvFBC.cpp src/tcpServer.cpp src/NvFBCUtils.c )
 target_link_libraries( videoCapture 
@@ -59,6 +72,7 @@ target_link_libraries( videoCapture
     PRIVATE ${AV_UTIL_LIBRARIES} 
     PRIVATE ${AV_SWSCALE_LIBRARIES}
     PRIVATE ${XORG_DO}
+    Boost::thread
     )
 
 project( videoStream )
@@ -69,4 +83,5 @@ target_link_libraries( videoStream
     PRIVATE ${OpenGL_LIBRARIES} 
     PRIVATE ${X11_LIBRARIES}
     PRIVATE ${XORG_DO_LIBRARIES}
+    Boost::thread
     )

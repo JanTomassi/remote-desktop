@@ -71,18 +71,16 @@ int tcpServerAV::send_frame(videoThreadParams *video_param) {
       boost::asio::buffer(header, PKTSIZE),
       boost::asio::buffer(video_param->pkt->buf->data, video_param->pkt->buf->size)});
 
-  // io_context.restart();
-  // boost::asio::async_write(
-  //     *socket, *send, [](boost::system::error_code ec, std::size_t) {
-  //       if (ec)
-  //         std::cout << "Lambda Send: " << ec.message() << std::endl;
-  //     });
-  // try {
-  //   io_context.run();
-  // } catch (std::exception e) {
-  //   std::cout << e.what() << std::endl;
-  // }
+  io_context.restart();
+  boost::asio::async_write(*socket, *send, [](boost::system::error_code ec, std::size_t) {
+    if (ec) std::cout << "Lambda Send: " << ec.message() << std::endl;
+  });
+  try {
+    io_context.run();
+  } catch (std::exception e) {
+    std::cout << e.what() << std::endl;
+  }
 
-  boost::asio::write(*socket, *send, ignored_error);
+  // boost::asio::write(*socket, *send, ignored_error);
   return 0;
 }

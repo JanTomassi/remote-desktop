@@ -6,7 +6,6 @@
 
 #include <dlfcn.h>
 #include <getopt.h>
-#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +31,7 @@ extern "C" {
 #include <xdo.h>
 
 #include <boost/asio.hpp>
+#include <boost/thread.hpp>
 
 #include "NvFBCUtils.h"
 #include "protocol.hpp"
@@ -100,6 +100,7 @@ static void th_entry_point(videoThreadParams *th_params) {
      */
     grabParams.pFrameGrabInfo = &frameInfo;
 
+    int t1 = NvFBCUtilsGetTimeInMillis();
     /*
      * Capture a new frame.
      */
@@ -108,20 +109,24 @@ static void th_entry_point(videoThreadParams *th_params) {
       fprintf(stderr, "%s\n", pFn.nvFBCGetLastErrorStr(fbcHandle));
       goto done;
     }
+    int t2 = NvFBCUtilsGetTimeInMillis();
 
-    res = av_frame_make_writable(th_params->frame);
+    int t3 = NvFBCUtilsGetTimeInMillis();
+    res    = av_frame_make_writable(th_params->frame);
     if (res < 0) exit(1);
 
     size_t pos = th_params->ctx->height * th_params->frame->linesize[0];
     memcpy(th_params->frame->data[0], frame, pos);
 
     /* Cb and Cr */
-    memcpy(th_params->frame->data[1], &frame[pos + 1], th_params->ctx->height * th_params->frame->linesize[1]);
+    memcpy(th_params->frame->data[1], &frame[pos], th_params->ctx->height * th_params->frame->linesize[1]);
     pos *= 2;
-    memcpy(th_params->frame->data[2], &frame[pos + 1], th_params->ctx->height * th_params->frame->linesize[2]);
+    memcpy(th_params->frame->data[2], &frame[pos], th_params->ctx->height * th_params->frame->linesize[2]);
 
     th_params->frame->pts++;
     server->encode_send(th_params);
+    int t4 = NvFBCUtilsGetTimeInMillis();
+    // printf("taking time: %d\nsending time: %d\ntotal time: %d\n", t2 - t1, t4 - t3, t4 - t1 - 16);
   }
 
 done:
@@ -137,6 +142,14 @@ done:
     fprintf(stderr, "%s\n", pFn.nvFBCGetLastErrorStr(fbcHandle));
     return;
   }
+}
+
+static void th_xdo_server() {
+  boost::asio::io_context        io_context;
+  boost::asio::ip::tcp::acceptor acceptor(io_context, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), 3201));
+  boost::asio::ip::tcp::socket   socket(acceptor.accept());
+
+  xdo_packet_t hid;
 }
 
 /**
@@ -163,7 +176,8 @@ int main(int argc, char *argv[]) {
 
   int opt, res;
 
-  pthread_t         th_id;
+  boost::thread     th_AV;
+  boost::thread     th_XDO;
   videoThreadParams th_params;
 
   NVFBCSTATUS fbcStatus;
@@ -281,7 +295,7 @@ int main(int argc, char *argv[]) {
   createCaptureParams.frameSize.h      = VSIZEH;
   createCaptureParams.eTrackingType    = NVFBC_TRACKING_OUTPUT;
   createCaptureParams.dwOutputId       = statusParams.outputs[1].dwId;
-  createCaptureParams.dwSamplingRateMs = 30;
+  createCaptureParams.dwSamplingRateMs = 16;
 
   fbcStatus = pFn.nvFBCCreateCaptureSession(fbcHandle, &createCaptureParams);
   if (fbcStatus != NVFBC_SUCCESS) {
@@ -332,8 +346,8 @@ int main(int argc, char *argv[]) {
   // Set context param
   th_params.ctx->width     = VSIZEW;
   th_params.ctx->height    = VSIZEH;
-  th_params.ctx->time_base = (AVRational){1, 30};
-  th_params.ctx->framerate = (AVRational){30, 1};
+  th_params.ctx->time_base = (AVRational){1, 15};
+  th_params.ctx->framerate = (AVRational){15, 1};
   th_params.ctx->pix_fmt   = AV_PIX_FMT_YUV444P;
 
   // Set specific context params
@@ -364,18 +378,16 @@ int main(int argc, char *argv[]) {
 
   printf("Size %d x %d\n", th_params.frame->width, th_params.frame->height);
 
-  res = pthread_create(&th_id, NULL, (void *(*)(void *))th_entry_point, (void *)&th_params);
+  boost::thread *th_swap = new boost::thread(th_entry_point, &th_params);
+  th_AV.swap(*th_swap);
+  delete th_swap;
 
-  if (res) {
-    fprintf(stderr, "Unable to create worker thread (res: %d)\n", res);
-    return EXIT_FAILURE;
-  }
+  th_swap = new boost::thread(th_xdo_server);
+  th_XDO.swap(*th_swap);
+  delete th_swap;
 
-  res = pthread_join(th_id, NULL);
-  if (res) {
-    fprintf(stderr, "Unable to join worker thread (res: %d)\n", res);
-    return EXIT_FAILURE;
-  }
+  th_XDO.join();
+  th_AV.join();
 
   /*
    * The main thread takes back the FBC context.
