@@ -20,6 +20,7 @@
 
 #include "SDL_pixels.h"
 #include "SDL_render.h"
+#include "SDL_stdinc.h"
 #include "SDL_surface.h"
 #include "SDL_video.h"
 
@@ -89,8 +90,9 @@ bool init_show() {
   } else {
     int res;
     // Create window
-    res = SDL_CreateWindowAndRenderer(1920, 1080, SDL_WINDOW_MOUSE_GRABBED | SDL_WINDOW_RESIZABLE, &client_SDL.window,
+    res = SDL_CreateWindowAndRenderer(640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_FULLSCREEN, &client_SDL.window,
                                       &client_SDL.renderer);
+    SDL_SetWindowFullscreen(client_SDL.window, SDL_TRUE);
     if (res < 0) {
       printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
       success = false;
@@ -133,9 +135,12 @@ void decode_pkt(AVCodecContext *dec_ctx, AVFrame *frame, AVPacket *pkt) {
     int width  = frame->width;
     int height = frame->height;
 
-    if (client_SDL.conversion == NULL)
-      client_SDL.conversion = sws_getContext(width, height, (AVPixelFormat)frame->format, width, height,
-                                             AVPixelFormat::AV_PIX_FMT_RGB32, SWS_POINT, NULL, NULL, NULL);
+    // Rescale using the window current size
+    int windowW;
+    int windowH;
+    SDL_GetWindowSize(client_SDL.window, &windowW, &windowH);
+    client_SDL.conversion = sws_getContext(width, height, (AVPixelFormat)frame->format, windowW, windowH,
+                                           AVPixelFormat::AV_PIX_FMT_RGB32, SWS_POINT, NULL, NULL, NULL);
 
     AVFrame *bgrFrame = av_frame_alloc();
 
@@ -256,7 +261,11 @@ class _Endpoint {
   }
 
   _Endpoint() : socket(io_service) {
-    end_point = boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("192.168.0.1"), 3200);
+    end_point = boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(REMOTE_IP), 3200);
+    socket.connect(end_point);
+  };
+  _Endpoint(const std::string &ip, const uint16_t &port) : socket(io_service) {
+    end_point = boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(ip), port);
     socket.connect(end_point);
   };
   _Endpoint(const _Endpoint &)            = delete;
@@ -270,7 +279,8 @@ class _Endpoint {
 
 int main() {
   _Decode   _DecodeContext;
-  _Endpoint _EndpointContext;
+  _Endpoint _EndpointAV(REMOTE_IP, PORT_AV);
+  _Endpoint _EndpointC(REMOTE_IP, PORT_XDO);
 
   av_log_set_level(AV_LOG_INFO);
 
@@ -283,7 +293,7 @@ int main() {
 
       // Retrive 64 bytes header from socket
       // std::function<void()> fReadHeader = [&]() {
-      _EndpointContext.readHeader(*receive_buffer);
+      _EndpointAV.readHeader(*receive_buffer);
       //};
 
       // Parsing header
@@ -297,14 +307,14 @@ int main() {
       // std::function<void()> fReadPkt = [&]() {
       boost::asio::mutable_buffer packetData(_DecodeContext.pkt->data, _DecodeContext.header_data.image_size_bytes);
 
-      _EndpointContext.readPacket(packetData, _DecodeContext.header_data.image_size_bytes);
+      _EndpointAV.readPacket(packetData, _DecodeContext.header_data.image_size_bytes);
       //};
 
       // Decode AV packet
       // std::function<void()> fDecodePkt = [&]() {
       decode_pkt(_DecodeContext.c, _DecodeContext.frame, _DecodeContext.pkt);
       av_packet_unref(_DecodeContext.pkt);
-      // };  //< Frunction to run on packet read success
+      // };
       // _EndpointContext.runIfNoError(fReadPkt, fDecodePkt);
     }
   } catch (std::exception &e) {

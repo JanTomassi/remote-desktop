@@ -57,7 +57,7 @@ project( videoCapture )
 
 message("Test di boost\n${Boost_LIBS}\n\n")
 
-add_executable( videoCapture src/videoCaptureNvFBC.cpp src/tcpServer.cpp src/NvFBCUtils.c )
+add_executable( videoCapture src/videoCaptureNvFBC.cpp src/tcpServer.cpp src/NvFBCUtils.c src/protocol.cpp )
 target_link_libraries( videoCapture 
     PRIVATE SDL3::SDL3-static 
     PRIVATE ${OpenCV_LIBS} 
@@ -76,7 +76,7 @@ target_link_libraries( videoCapture
     )
 
 project( videoStream )
-add_executable( videoStream src/tcpClient.cpp )
+add_executable( videoStream src/tcpClient.cpp src/protocol.cpp )
 target_link_libraries( videoStream 
     PRIVATE SDL3::SDL3-static
     PRIVATE ${OpenCV_LIBS} 

@@ -1,6 +1,7 @@
 #pragma once
 //! @brief tcp socket port for AV packet
 #include <cstdint>
+extern const char *REMOTE_IP;
 #define PORT_AV 3200
 #define PORT_XDO 3201
 #define PKTSIZE 64

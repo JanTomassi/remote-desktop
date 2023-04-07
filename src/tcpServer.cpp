@@ -75,6 +75,7 @@ int tcpServerAV::send_frame(videoThreadParams *video_param) {
   boost::asio::async_write(*socket, *send, [](boost::system::error_code ec, std::size_t) {
     if (ec) std::cout << "Lambda Send: " << ec.message() << std::endl;
   });
+
   try {
     io_context.run();
   } catch (std::exception e) {

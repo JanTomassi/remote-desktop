@@ -126,6 +126,7 @@ static void th_entry_point(videoThreadParams *th_params) {
     th_params->frame->pts++;
     server->encode_send(th_params);
     int t4 = NvFBCUtilsGetTimeInMillis();
+
     // printf("taking time: %d\nsending time: %d\ntotal time: %d\n", t2 - t1, t4 - t3, t4 - t1 - 16);
   }
 
