@@ -155,19 +155,6 @@ void decode_pkt(AVCodecContext *dec_ctx, AVFrame *frame, AVPacket *pkt) {
   }
 }
 
-void th_send_xdo() {
-  xdo_t *x       = xdo_new(NULL);
-  int    mouse_x = 0, mouse_y = 0, mouse_screen_num = 0;
-
-  xdo_get_mouse_location(x, &mouse_x, &mouse_y, &mouse_screen_num);
-
-  for (;;) {
-    xdo_wait_for_mouse_move_from(x, mouse_x, mouse_y);
-    xdo_get_mouse_location(x, &mouse_x, &mouse_y, &mouse_screen_num);
-    std::cout << "x: " << mouse_x << "\ty: " << mouse_y << "\tsn: " << mouse_screen_num << std::endl;
-  }
-}
-
 /**
  * @brief struct to manage ffmpeg decode context
  **/
@@ -277,15 +264,7 @@ class _Endpoint {
   boost::system::error_code mTcpError;
 };
 
-int main() {
-  _Decode   _DecodeContext;
-  _Endpoint _EndpointAV(REMOTE_IP, PORT_AV);
-  _Endpoint _EndpointC(REMOTE_IP, PORT_XDO);
-
-  av_log_set_level(AV_LOG_INFO);
-
-  // boost::thread xdo_client(th_send_xdo);
-
+void av_thread_function(_Decode &dContext, _Endpoint &ePoint) {
   try {
     init_show();
     for (;;) {
@@ -293,33 +272,59 @@ int main() {
 
       // Retrive 64 bytes header from socket
       // std::function<void()> fReadHeader = [&]() {
-      _EndpointAV.readHeader(*receive_buffer);
+      ePoint.readHeader(*receive_buffer);
       //};
 
       // Parsing header
       // std::function<void()> fParseHeader = [&]() {
-      _DecodeContext.header_data = parse_header(*receive_buffer);
-      av_new_packet(_DecodeContext.pkt, _DecodeContext.header_data.image_size_bytes);
+      dContext.header_data = parse_header(*receive_buffer);
+      av_new_packet(dContext.pkt, dContext.header_data.image_size_bytes);
       //};
       //_EndpointContext.runIfNoError(fReadHeader, fParseHeader);
 
       // Retrive packet from socket
       // std::function<void()> fReadPkt = [&]() {
-      boost::asio::mutable_buffer packetData(_DecodeContext.pkt->data, _DecodeContext.header_data.image_size_bytes);
+      boost::asio::mutable_buffer packetData(dContext.pkt->data, dContext.header_data.image_size_bytes);
 
-      _EndpointAV.readPacket(packetData, _DecodeContext.header_data.image_size_bytes);
+      ePoint.readPacket(packetData, dContext.header_data.image_size_bytes);
       //};
 
       // Decode AV packet
       // std::function<void()> fDecodePkt = [&]() {
-      decode_pkt(_DecodeContext.c, _DecodeContext.frame, _DecodeContext.pkt);
-      av_packet_unref(_DecodeContext.pkt);
+      decode_pkt(dContext.c, dContext.frame, dContext.pkt);
+      av_packet_unref(dContext.pkt);
       // };
       // _EndpointContext.runIfNoError(fReadPkt, fDecodePkt);
     }
   } catch (std::exception &e) {
     std::cerr << e.what() << std::endl;
   }
+}
+
+void th_send_xdo(_Endpoint ePoint) {
+  xdo_t *x       = xdo_new(NULL);
+  int    mouse_x = 0, mouse_y = 0, mouse_screen_num = 0;
+
+  xdo_get_mouse_location(x, &mouse_x, &mouse_y, &mouse_screen_num);
+
+  for (;;) {
+    xdo_wait_for_mouse_move_from(x, mouse_x, mouse_y);
+    xdo_get_mouse_location(x, &mouse_x, &mouse_y, &mouse_screen_num);
+    std::cout << "x: " << mouse_x << "\ty: " << mouse_y << "\tsn: " << mouse_screen_num << std::endl;
+  }
+}
+
+int main() {
+  _Decode   _DecodeContext;
+  _Endpoint _EndpointAV(REMOTE_IP, PORT_AV);
+  _Endpoint _EndpointC(REMOTE_IP, PORT_XDO);
+
+  av_log_set_level(AV_LOG_INFO);
+
+  boost::thread av_thread(av_thread_function, &_DecodeContext, &_EndpointAV);
+  boost::thread xdo_thread(th_send_xdo);
+  xdo_thread.join();
+  av_thread.join();
 
   return 0;
 }
