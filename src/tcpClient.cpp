@@ -1,5 +1,4 @@
 #include <SDL.h>
-#include <SDL3/SDL.h>
 #include <stdint.h>
 
 #include <boost/array.hpp>
@@ -15,9 +14,13 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
+#include "SDL_events.h"
+#include "SDL_init.h"
+#include "SDL_oldnames.h"
 #include "SDL_pixels.h"
 #include "SDL_render.h"
 #include "SDL_stdinc.h"
@@ -37,6 +40,17 @@ extern "C" {
 }
 
 #include "../include/protocol.hpp"
+
+struct _Decode;
+struct _Endpoint;
+
+typedef struct av_thread_args {
+  _Decode   &dec;
+  _Endpoint &end;
+} av_thread_args;
+typedef struct c_thread_args {
+  _Endpoint &end;
+} c_thread_args;
 
 struct client_SDL {
   SDL_Window   *window        = NULL;
@@ -212,7 +226,7 @@ struct _Decode {
 
 /**
  * @brief stuct to manage tcp endpoint */
-class _Endpoint {
+struct _Endpoint {
  public:
   boost::asio::io_service        io_service;
   boost::asio::ip::tcp::endpoint end_point;
@@ -232,7 +246,12 @@ class _Endpoint {
    * @param[in] byteSize how big is the rPacket in bytes */
   void readPacket(boost::asio::mutable_buffer &rPacket, size_t byteSize) {
     boost::asio::read(socket, rPacket, boost::asio::transfer_exactly(byteSize), mTcpError);
-  }
+  };
+  /**
+   * @brief write buffer to socket
+   * @param[in] wPacket write this buffer on the object socket
+   */
+  void writePacket(const boost::asio::mutable_buffer &wPacket) { boost::asio::write(socket, wPacket); }
   /**
    * @brief run read funtion then test if the asio read return any error and
    * then run parser function
@@ -264,7 +283,7 @@ class _Endpoint {
   boost::system::error_code mTcpError;
 };
 
-void av_thread_function(_Decode &dContext, _Endpoint &ePoint) {
+void av_thread_function(av_thread_args args) {
   try {
     init_show();
     for (;;) {
@@ -272,27 +291,27 @@ void av_thread_function(_Decode &dContext, _Endpoint &ePoint) {
 
       // Retrive 64 bytes header from socket
       // std::function<void()> fReadHeader = [&]() {
-      ePoint.readHeader(*receive_buffer);
+      args.end.readHeader(*receive_buffer);
       //};
 
       // Parsing header
       // std::function<void()> fParseHeader = [&]() {
-      dContext.header_data = parse_header(*receive_buffer);
-      av_new_packet(dContext.pkt, dContext.header_data.image_size_bytes);
+      args.dec.header_data = parse_header(*receive_buffer);
+      av_new_packet(args.dec.pkt, args.dec.header_data.image_size_bytes);
       //};
       //_EndpointContext.runIfNoError(fReadHeader, fParseHeader);
 
       // Retrive packet from socket
       // std::function<void()> fReadPkt = [&]() {
-      boost::asio::mutable_buffer packetData(dContext.pkt->data, dContext.header_data.image_size_bytes);
+      boost::asio::mutable_buffer packetData(args.dec.pkt->data, args.dec.header_data.image_size_bytes);
 
-      ePoint.readPacket(packetData, dContext.header_data.image_size_bytes);
+      args.end.readPacket(packetData, args.dec.header_data.image_size_bytes);
       //};
 
       // Decode AV packet
       // std::function<void()> fDecodePkt = [&]() {
-      decode_pkt(dContext.c, dContext.frame, dContext.pkt);
-      av_packet_unref(dContext.pkt);
+      decode_pkt(args.dec.c, args.dec.frame, args.dec.pkt);
+      av_packet_unref(args.dec.pkt);
       // };
       // _EndpointContext.runIfNoError(fReadPkt, fDecodePkt);
     }
@@ -301,17 +320,43 @@ void av_thread_function(_Decode &dContext, _Endpoint &ePoint) {
   }
 }
 
-void th_send_xdo(_Endpoint ePoint) {
-  xdo_t *x       = xdo_new(NULL);
-  int    mouse_x = 0, mouse_y = 0, mouse_screen_num = 0;
+void th_send_xdo(c_thread_args arg) {
+  SDL_Event event;
 
-  xdo_get_mouse_location(x, &mouse_x, &mouse_y, &mouse_screen_num);
+  std::vector<SDL_Keysym> input_buf;
+  while (SDL_PollEvent(&event)) {
+    switch (event.type) {
+      case SDL_EVENT_KEY_DOWN:
+        input_buf.push_back(event.key.keysym);
+        break;
+      case SDL_EVENT_QUIT:
+        goto TH_SEND_EXIT;
+        break;
+      default:
+        break;
+    }
+    try {
+      // Write the header
+      std::stringstream header_stream;
+      header_stream << input_buf.size() * sizeof(SDL_Keysym) << 'e' << std::flush;
+      std::string header = header_stream.str();
+      header.append(PKTSIZE - header.size(), '0');
+      arg.end.writePacket(boost::asio::buffer(header, PKTSIZE));
+      std::cout << header << std::endl;
 
-  for (;;) {
-    xdo_wait_for_mouse_move_from(x, mouse_x, mouse_y);
-    xdo_get_mouse_location(x, &mouse_x, &mouse_y, &mouse_screen_num);
-    std::cout << "x: " << mouse_x << "\ty: " << mouse_y << "\tsn: " << mouse_screen_num << std::endl;
+      // Write the packet
+      arg.end.writePacket(boost::asio::buffer(input_buf));
+      for (auto v : input_buf) {
+        std::cout << v.sym;
+      }
+      std::cout << std::endl;
+    } catch (std::exception &e) {
+      std::cerr << e.what() << std::endl;
+    }
   }
+TH_SEND_EXIT:
+  SDL_Quit();
+  return;
 }
 
 int main() {
@@ -321,8 +366,11 @@ int main() {
 
   av_log_set_level(AV_LOG_INFO);
 
-  boost::thread av_thread(av_thread_function, &_DecodeContext, &_EndpointAV);
-  boost::thread xdo_thread(th_send_xdo);
+  av_thread_args _av_args{_DecodeContext, _EndpointAV};
+  c_thread_args  _c_args{_EndpointC};
+
+  boost::thread av_thread(av_thread_function, _av_args);
+  boost::thread xdo_thread(th_send_xdo, _c_args);
   xdo_thread.join();
   av_thread.join();
 
